@@ -1,7 +1,8 @@
 import os
 import sys
 import urllib3
-urllib3.set_default_timeout(10)
+urllib3.Timeout.DEFAULT_TIMEOUT = urllib3.Timeout(10)
+
 
 
 '''
