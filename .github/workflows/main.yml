@@ -1,0 +1,37 @@
+name: XiaomiShop UI automation test
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 安装Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: 安装依赖
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 安装Chrome浏览器
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser chromium-chromedriver
+
+      - name: 运行自动化测试
+        run: pytest tests/ -v --alluredir=allure-results
+
+      - name: 上传测试报告数据
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results
+          path: allure-results
