@@ -1,7 +1,8 @@
 import os
 import sys
 import urllib3
-urllib3.Timeout.DEFAULT_TIMEOUT = urllib3.Timeout(10)
+urllib3.Timeout.DEFAULT_TIMEOUT = urllib3.Timeout(total=10)
+
 
 
 
@@ -52,6 +53,19 @@ def driver():
     chrome_options.add_experimental_option("useAutomationExtension", False)
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
 
+    # 适配GitHub Actions的无界面运行
+    chrome_options.add_argument("--headless=new")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    
+    # 兼容本地/GitHub的驱动路径
+    try:
+        from config.config import CHROME_DRIVER_PATH
+        service = Service(CHROME_DRIVER_PATH)
+    except Exception as e:
+        logger.warning(f"本地驱动路径未找到，使用系统默认路径：{e}")
+        service = Service("/usr/bin/chromedriver")
+
     #初始化浏览器
     driver = webdriver.Chrome(service=Service(CHROME_DRIVER_PATH),options=chrome_options)
     driver.maximize_window()
@@ -100,6 +114,7 @@ def pytest_runtest_makereport(item, call):
     rep = outcome.get_result()
     # 给用例对象添加结果属性（rep_call：执行阶段结果）
     setattr(item, f"rep_{rep.when}", rep)
+
 
 
 
