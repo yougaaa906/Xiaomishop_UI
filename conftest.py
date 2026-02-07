@@ -25,6 +25,7 @@ import pytest
 import logging
 from datetime import datetime
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from config.config import TIMEOUT, TEST_URL, CHROME_DRIVER_PATH
 
@@ -108,6 +109,7 @@ def pytest_runtest_makereport(item, call):
     rep = outcome.get_result()
     # 给用例对象添加结果属性（rep_call：执行阶段结果）
     setattr(item, f"rep_{rep.when}", rep)
+
 
 
 
