@@ -1,13 +1,12 @@
-name: XiaomiShop UI automation test
+name: Web UI自动化测试
 
 on:
-  push:
-    branches: [ main ]
+  workflow_dispatch:  # 手动触发（面试时优先写这个，可控）
+  # 可选加PR触发：pull_request: branches: [main]
 
 jobs:
-  test:
+  ui-test:
     runs-on: ubuntu-latest
-
     steps:
       - name: 拉取代码
         uses: actions/checkout@v4
@@ -16,21 +15,38 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
+          cache: pip  # 缓存Python环境
+
+      - name: 缓存Python依赖
+        uses: actions/cache@v4
+        with:
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          path: ~/.cache/pip
 
       - name: 安装依赖
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+      - name: 缓存Chrome浏览器
+        uses: actions/cache@v4
+        with:
+          key: ${{ runner.os }}-chrome
+          path: |
+            /usr/bin/chromium-browser
+            /usr/bin/chromedriver
 
       - name: 安装Chrome浏览器
         run: |
-          sudo apt-get update
-          sudo apt-get install -y chromium-browser chromium-chromedriver
+          if [ ! -f /usr/bin/chromium-browser ]; then
+            sudo apt-get update
+            sudo apt-get install -y chromium-browser chromium-chromedriver
+          fi
 
       - name: 运行自动化测试
         run: pytest tests/ -v --alluredir=allure-results
 
-      - name: 上传测试报告数据
+      - name: 上传测试报告
         uses: actions/upload-artifact@v4
         with:
           name: allure-results
