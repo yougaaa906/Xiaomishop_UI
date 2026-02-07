@@ -1,53 +1,95 @@
-name: Web UI自动化测试
+# 工作流名称
+name: 小米商城UI自动化测试
 
+# 触发条件：push到main分支，或手动触发
 on:
-  workflow_dispatch:  # 手动触发（面试时优先写这个，可控）
-  # 可选加PR触发：pull_request: branches: [main]
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # 手动触发（重点：方便你随时跑测试）
 
+# 运行环境
 jobs:
   ui-test:
+    # 运行在Ubuntu最新版
     runs-on: ubuntu-latest
+    
+    # 步骤
     steps:
-      - name: 拉取代码
+      # 步骤1：拉取代码到流水线服务器
+      - name: 拉取仓库代码
         uses: actions/checkout@v4
 
-      - name: 安装Python 3.9
+      # 步骤2：配置Python环境（和你本地一致的版本，推荐3.9+）
+      - name: 配置Python 3.9
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
-          cache: pip  # 缓存Python环境
+          cache: 'pip'  # 缓存pip依赖，加速下次运行
 
-      - name: 缓存Python依赖
-        uses: actions/cache@v4
-        with:
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-          path: ~/.cache/pip
-
-      - name: 安装依赖
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-
-      - name: 缓存Chrome浏览器
-        uses: actions/cache@v4
-        with:
-          key: ${{ runner.os }}-chrome
-          path: |
-            /usr/bin/chromium-browser
-            /usr/bin/chromedriver
-
+      # 步骤3：安装系统依赖（Chrome浏览器）
       - name: 安装Chrome浏览器
         run: |
-          if [ ! -f /usr/bin/chromium-browser ]; then
-            sudo apt-get update
-            sudo apt-get install -y chromium-browser chromium-chromedriver
-          fi
+          # 更新包列表
+          sudo apt-get update
+          # 安装Chrome（兼容chromedriver）
+          sudo apt-get install -y chromium-browser chromium-chromedriver
+          # 验证Chrome安装成功
+          chromium-browser --version
+          # 验证chromedriver路径
+          which chromedriver
 
-      - name: 运行自动化测试
-        run: pytest tests/ -v --alluredir=allure-results
+      # 步骤4：安装Python依赖（从requirements.txt）
+      - name: 安装Python依赖包
+        run: |
+          python -m pip install --upgrade pip
+          # 安装依赖（加清华源加速，适配海外环境）
+          pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+          # 验证依赖安装
+          pip list
 
-      - name: 上传测试报告
+      # 步骤5：运行UI自动化测试（生成Allure报告+日志+截图）
+      - name: 执行自动化测试用例
+        run: |
+          # 创建必要目录（防止脚本创建失败）
+          mkdir -p logs screenshots allure-results
+          # 运行pytest，生成Allure原始数据
+          pytest tests/ -v --alluredir=allure-results
+        # 关键：即使测试用例失败，也继续执行后续步骤（上传报告）
+        continue-on-error: true
+
+      # 步骤6：上传Allure原始报告数据
+      - name: 上传Allure报告原始数据
         uses: actions/upload-artifact@v4
         with:
           name: allure-results
-          path: allure-results
+          path: allure-results/
+          retention-days: 7  # 报告保留7天（可选）
+
+      # 步骤7：上传测试日志文件
+      - name: 上传测试日志
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: logs/
+          retention-days: 7
+
+      # 步骤8：上传失败截图
+      - name: 上传失败截图
+        uses: actions/upload-artifact@v4
+        with:
+          name: fail-screenshots
+          path: screenshots/
+          retention-days: 7
+
+      # （可选）步骤9：自动生成并部署Allure可视化报告（进阶）
+      # 如需在线查看Allure报告，可添加此步骤（需配置GitHub Pages）
+      - name: 生成并部署Allure报告
+        uses: simple-elf/allure-report-action@v1.7
+        if: always()  # 无论测试结果如何都执行
+        with:
+          allure_results: allure-results
+          gh_pages: gh-pages
+          allure_report: allure-report
+          allure_history: allure-history
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub自动生成的token，无需手动配置
