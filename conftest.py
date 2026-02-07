@@ -45,40 +45,34 @@ def setup_logger():
 logger = setup_logger()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def driver():
-    #浏览器配置
-    chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    chrome_options.add_experimental_option("useAutomationExtension", False)
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-
-    # 适配GitHub Actions的无界面运行
-    chrome_options.add_argument("--headless=new")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
+    # 初始化Chrome选项
+    chrome_options = Options()
     
-    # 兼容本地/GitHub的驱动路径
-    try:
-        from config.config import CHROME_DRIVER_PATH
-        service = Service(CHROME_DRIVER_PATH)
-    except Exception as e:
-        logger.warning(f"本地驱动路径未找到，使用系统默认路径：{e}")
-        service = Service("/usr/bin/chromedriver")
-
-    #初始化浏览器
-    driver = webdriver.Chrome(service=Service(CHROME_DRIVER_PATH),options=chrome_options)
-    driver.maximize_window()
-    driver.get(TEST_URL)
-    driver.implicitly_wait(TIMEOUT)
-    logger.info(f"浏览器初始化完成，已打开测试网址：{TEST_URL}")
-
-    #返回浏览器驱动，以便后续用例使用
+    # 关键：判断是否是GitHub流水线环境（通过环境变量）
+    # GitHub Actions会自动设置CI=true的环境变量
+    is_ci = os.getenv("CI", "false") == "true"
+    
+    if is_ci:
+        # 流水线环境：开启无头模式+适配Ubuntu
+        chrome_options.add_argument("--headless")  # 无界面
+        chrome_options.add_argument("--no-sandbox")  # Ubuntu权限
+        chrome_options.add_argument("--disable-dev-shm-usage")  # 资源限制
+    else:
+        # 本地环境：有界面运行（方便调试），可加窗口大小
+        chrome_options.add_argument("--start-maximized")  # 窗口最大化
+    
+    # 自动下载匹配版本的ChromeDriver（核心）
+    chrome_service = Service(ChromeDriverManager().install())
+    
+    # 初始化driver
+    driver = webdriver.Chrome(service=chrome_service, options=chrome_options)
+    driver.implicitly_wait(10)  # 隐式等待
     yield driver
-
-    #后置操作
+    
+    # 清理资源
     driver.quit()
-    print("√ 所有用例执行完毕")
 
 
 # ========== 3. 失败自动截图夹具（新增，自动生效） ==========
@@ -114,6 +108,7 @@ def pytest_runtest_makereport(item, call):
     rep = outcome.get_result()
     # 给用例对象添加结果属性（rep_call：执行阶段结果）
     setattr(item, f"rep_{rep.when}", rep)
+
 
 
 
